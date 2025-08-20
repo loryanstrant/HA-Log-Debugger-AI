@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HA Log Debugger AI</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏠 HA Log Debugger AI</h1>
+            <p>AI-powered Home Assistant log analysis and recommendations</p>
+        </header>
+
+        <div class="status-bar">
+            <div class="status-item" id="health-status">
+                <span class="status-label">System Health:</span>
+                <span class="status-value" id="health-value">Checking...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Recommendations:</span>
+                <span class="status-value" id="recommendations-count">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Last Updated:</span>
+                <span class="status-value" id="last-updated">-</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="refresh-btn" class="btn btn-primary">Refresh</button>
+            <button id="analyze-btn" class="btn btn-secondary">Analyze Now</button>
+            <div class="filter-controls">
+                <label>
+                    <input type="checkbox" id="show-resolved" /> Show Resolved
+                </label>
+                <select id="severity-filter">
+                    <option value="">All Severities</option>
+                    <option value="CRITICAL">Critical</option>
+                    <option value="HIGH">High</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="LOW">Low</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-button active" data-tab="recommendations">Recommendations</button>
+            <button class="tab-button" data-tab="logs">Recent Logs</button>
+            <button class="tab-button" data-tab="stats">Statistics</button>
+        </div>
+
+        <div class="tab-content">
+            <!-- Recommendations Tab -->
+            <div id="recommendations" class="tab-pane active">
+                <div id="recommendations-list" class="recommendations-list">
+                    <div class="loading">Loading recommendations...</div>
+                </div>
+            </div>
+
+            <!-- Recent Logs Tab -->
+            <div id="logs" class="tab-pane">
+                <div class="logs-controls">
+                    <label>
+                        Lines to show: 
+                        <select id="log-lines">
+                            <option value="50">50</option>
+                            <option value="100" selected>100</option>
+                            <option value="200">200</option>
+                        </select>
+                    </label>
+                </div>
+                <div id="logs-list" class="logs-list">
+                    <div class="loading">Loading logs...</div>
+                </div>
+            </div>
+
+            <!-- Statistics Tab -->
+            <div id="stats" class="tab-pane">
+                <div id="stats-content" class="stats-content">
+                    <div class="loading">Loading statistics...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
