@@ -1,4 +1,0 @@
-2024-08-20 12:00:00 INFO (MainThread) [homeassistant.core] Starting Home Assistant
-2024-08-20 12:01:00 WARNING (MainThread) [homeassistant.components.sensor] Unable to connect to sensor.temperature
-2024-08-20 12:02:00 ERROR (MainThread) [homeassistant.components.light] Failed to turn on light.living_room: Connection timeout
-2024-08-20 12:03:00 CRITICAL (MainThread) [homeassistant.components.mqtt] MQTT broker connection lost, attempting reconnection

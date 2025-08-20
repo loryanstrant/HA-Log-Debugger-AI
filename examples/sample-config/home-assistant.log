@@ -1,0 +1,15 @@
+2024-08-20 08:00:00 INFO (MainThread) [homeassistant.core] Starting Home Assistant 2024.8.0
+2024-08-20 08:00:05 INFO (MainThread) [homeassistant.loader] Loading integration: default_config
+2024-08-20 08:00:10 INFO (MainThread) [homeassistant.setup] Setting up default_config
+2024-08-20 08:01:00 WARNING (MainThread) [homeassistant.components.sensor] Platform sensor does not generate unique IDs for sensor.cpu_temperature
+2024-08-20 08:01:30 WARNING (MainThread) [homeassistant.components.zha] Failed to connect to zigbee coordinator, retrying in 30 seconds
+2024-08-20 08:02:00 ERROR (MainThread) [homeassistant.components.light] Failed to turn on light.living_room_lamp: Device unreachable
+2024-08-20 08:02:15 ERROR (MainThread) [homeassistant.components.switch] Unable to control switch.outdoor_lights: Connection timeout after 30 seconds
+2024-08-20 08:03:00 WARNING (MainThread) [homeassistant.components.mqtt] MQTT client disconnected, attempting to reconnect
+2024-08-20 08:03:30 CRITICAL (MainThread) [homeassistant.components.recorder] Database connection lost, attempting to reconnect
+2024-08-20 08:04:00 ERROR (MainThread) [homeassistant.components.climate] Thermostat climate.main_floor is unavailable: Communication error
+2024-08-20 08:04:30 WARNING (MainThread) [homeassistant.components.automation] Automation 'Morning Routine' failed to execute: template error
+2024-08-20 08:05:00 INFO (MainThread) [homeassistant.components.mqtt] MQTT client connected successfully
+2024-08-20 08:05:30 INFO (MainThread) [homeassistant.components.recorder] Database connection restored
+2024-08-20 08:06:00 ERROR (MainThread) [homeassistant.components.camera] Failed to fetch image from camera.front_door: HTTP 404
+2024-08-20 08:06:30 WARNING (MainThread) [homeassistant.components.weather] Weather service API rate limit exceeded, will retry in 15 minutes
