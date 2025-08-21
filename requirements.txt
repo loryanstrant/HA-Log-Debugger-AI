@@ -5,5 +5,5 @@ openai==1.100.2
 aiofiles==24.1.0
 pydantic==2.9.2
 aiosqlite==0.20.0
-python-multipart==0.0.12
-jinja2==3.1.4
+python-multipart==0.0.18
+jinja2==3.1.6
