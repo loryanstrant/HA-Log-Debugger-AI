@@ -1,0 +1,38 @@
+# Development docker-compose example
+# This is a simplified version for testing without a real Home Assistant instance
+
+version: '3.8'
+
+services:
+  ha-log-debugger-ai:
+    build: .
+    container_name: ha-log-debugger-ai-dev
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # For development: mount a sample config directory
+      - ./examples/sample-config:/config:ro
+      # Mount data directory for SQLite database
+      - ./data:/data
+    environment:
+      # Required: OpenAI-compatible API configuration
+      - OPENAI_ENDPOINT_URL=https://api.openai.com/v1
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      
+      # Optional: Model configuration
+      - MODEL_NAME=gpt-3.5-turbo
+      
+      # Optional: Application configuration
+      - TZ=UTC
+      - HA_CONFIG_PATH=/config
+      - LOG_LEVEL=INFO
+      - WEB_PORT=8080
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
