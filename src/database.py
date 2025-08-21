@@ -14,7 +14,15 @@ class Database:
     """SQLite database manager for the application."""
     
     def __init__(self, db_path: str = "/data/ha_log_debugger.db"):
-        self.db_path = db_path
+        # Try to use the preferred path, fallback to writable location if needed
+        import os
+        if os.path.exists(os.path.dirname(db_path)) and os.access(os.path.dirname(db_path), os.W_OK):
+            self.db_path = db_path
+        else:
+            # Fallback to tmp if /data is not writable
+            fallback_path = "/tmp/ha_log_debugger.db"
+            logger.warning(f"Cannot write to {db_path}, using fallback: {fallback_path}")
+            self.db_path = fallback_path
         
     async def initialize(self):
         """Initialize the database and create tables if they don't exist."""

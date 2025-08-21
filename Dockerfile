@@ -5,6 +5,9 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
+# Upgrade pip to latest version for better dependency resolution
+RUN pip install --upgrade pip
+
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
@@ -20,27 +23,27 @@ FROM python:3.11-slim
 LABEL maintainer="HA Log Debugger AI"
 LABEL description="AI-powered Home Assistant log analysis and recommendations"
 
-# Create non-root user
+# Create non-root user with proper permissions
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
-# Install runtime dependencies
+# Install runtime dependencies and clean up in a single layer
 RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# Copy Python packages from builder
-COPY --from=builder /root/.local /home/appuser/.local
+# Create data directory with proper permissions for mounted volumes
+RUN mkdir -p /data && chown appuser:appuser /data
+
+# Copy Python packages from builder and ensure proper ownership
+COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
 
 # Set up application directory
 WORKDIR /app
 
-# Copy application code
-COPY src/ ./src/
-COPY static/ ./static/
-
-# Create data directory for SQLite database
-RUN mkdir -p /data && chown appuser:appuser /data
+# Copy application code and ensure proper ownership
+COPY --chown=appuser:appuser src/ ./src/
+COPY --chown=appuser:appuser static/ ./static/
 
 # Switch to non-root user
 USER appuser
