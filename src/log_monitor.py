@@ -42,18 +42,18 @@ class LogMonitor:
         
         # Regex patterns for parsing log entries
         self.log_pattern = re.compile(
-            r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+'  # timestamp
-            r'(\w+)\s+'                                   # log level
-            r'\((\w+)\)\s+'                              # thread
-            r'\[([^\]]+)\]\s+'                           # component
-            r'(.+)'                                      # message
+            r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d{3})?)\s+'  # timestamp with optional milliseconds
+            r'(\w+)\s+'                                               # log level
+            r'\((\w+)\)\s+'                                          # thread
+            r'\[([^\]]+)\]\s+'                                       # component
+            r'(.+)'                                                  # message
         )
         
         # Alternative pattern for logs without component
         self.simple_log_pattern = re.compile(
-            r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+'  # timestamp
-            r'(\w+)\s+'                                   # log level
-            r'(.+)'                                      # message
+            r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d{3})?)\s+'  # timestamp with optional milliseconds
+            r'(\w+)\s+'                                               # log level
+            r'(.+)'                                                  # message
         )
     
     async def start(self):
@@ -112,6 +112,15 @@ class LogMonitor:
         except Exception as e:
             logger.error(f"Error processing log lines: {e}")
     
+    def _parse_timestamp(self, timestamp_str: str) -> datetime:
+        """Parse timestamp string with optional milliseconds."""
+        if '.' in timestamp_str:
+            # Format with milliseconds
+            return datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S.%f")
+        else:
+            # Format without milliseconds
+            return datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+    
     def _parse_log_line(self, line: str) -> Optional[LogEntry]:
         """Parse a log line into a LogEntry object."""
         try:
@@ -119,7 +128,7 @@ class LogMonitor:
             match = self.log_pattern.match(line)
             if match:
                 timestamp_str, level_str, thread, component, message = match.groups()
-                timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                timestamp = self._parse_timestamp(timestamp_str)
                 
                 try:
                     level = LogLevel(level_str.upper())
@@ -138,7 +147,7 @@ class LogMonitor:
             match = self.simple_log_pattern.match(line)
             if match:
                 timestamp_str, level_str, message = match.groups()
-                timestamp = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                timestamp = self._parse_timestamp(timestamp_str)
                 
                 try:
                     level = LogLevel(level_str.upper())
