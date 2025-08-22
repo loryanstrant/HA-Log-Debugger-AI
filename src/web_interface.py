@@ -95,13 +95,33 @@ class WebInterface:
                 raise HTTPException(status_code=500, detail="Failed to resolve recommendation")
         
         @self.app.get("/api/logs/recent")
-        async def get_recent_logs(lines: int = 100) -> List[dict]:
-            """Get recent log entries."""
-            if not self.log_monitor:
-                raise HTTPException(status_code=503, detail="Log monitor not available")
-            
+        async def get_recent_logs(
+            lines: int = 100, 
+            level: Optional[str] = None,
+            component: Optional[str] = None,
+            source: str = "file"
+        ) -> List[dict]:
+            """Get recent log entries from file or database."""
             try:
-                entries = await self.log_monitor.read_recent_logs(lines=lines)
+                if source == "database":
+                    # Get logs from database with filtering support
+                    entries = await self.database.get_logs(
+                        limit=lines, 
+                        level_filter=level, 
+                        component_filter=component
+                    )
+                else:
+                    # Get logs from file (existing behavior)
+                    if not self.log_monitor:
+                        raise HTTPException(status_code=503, detail="Log monitor not available")
+                    entries = await self.log_monitor.read_recent_logs(lines=lines)
+                    
+                    # Apply client-side filtering if specified
+                    if level:
+                        entries = [e for e in entries if e.level.value == level]
+                    if component:
+                        entries = [e for e in entries if e.component == component]
+                
                 return [
                     {
                         "timestamp": entry.timestamp.isoformat(),

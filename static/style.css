@@ -334,6 +334,11 @@ header p {
     color: white;
 }
 
+.log-level.debug {
+    background-color: #6c757d;
+    color: white;
+}
+
 .log-component {
     color: var(--secondary-color);
     font-weight: bold;

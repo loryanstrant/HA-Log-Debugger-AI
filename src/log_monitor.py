@@ -105,9 +105,8 @@ class LogMonitor:
                 if line:
                     entry = self._parse_log_line(line)
                     if entry and self.callback:
-                        # Only process WARNING, ERROR, and CRITICAL logs
-                        if entry.level in [LogLevel.WARNING, LogLevel.ERROR, LogLevel.CRITICAL]:
-                            await self.callback(entry)
+                        # Process all log levels (INFO, DEBUG, WARNING, ERROR, CRITICAL)
+                        await self.callback(entry)
         
         except Exception as e:
             logger.error(f"Error processing log lines: {e}")
