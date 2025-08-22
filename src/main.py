@@ -6,6 +6,7 @@ import os
 import signal
 import sys
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 
 import uvicorn
@@ -40,7 +41,11 @@ class HALogDebuggerAI:
             "ha_config_path": os.getenv("HA_CONFIG_PATH", "/config"),
             "log_level": os.getenv("LOG_LEVEL", "INFO"),
             "web_port": int(os.getenv("WEB_PORT", 8080)),
-            "tz": os.getenv("TZ", "UTC")
+            "tz": os.getenv("TZ", "UTC"),
+            # New configuration options for log capture and AI analysis
+            "capture_all_logs": os.getenv("CAPTURE_ALL_LOGS", "true").lower() == "true",
+            "ai_analysis_levels": os.getenv("AI_ANALYSIS_LEVELS", "WARNING,ERROR,CRITICAL").split(","),
+            "log_retention_days": int(os.getenv("LOG_RETENTION_DAYS", 30))
         }
         
         # Validate required configuration
@@ -94,6 +99,10 @@ class HALogDebuggerAI:
     async def _process_log_entry(self, log_entry):
         """Process a new log entry from the monitor."""
         try:
+            # Skip processing if capture_all_logs is disabled and this is not a critical level
+            if not self.config["capture_all_logs"] and log_entry.level.value not in self.config["ai_analysis_levels"]:
+                return
+                
             # Generate hash for the log entry
             log_hash = self.log_monitor.generate_log_hash(log_entry)
             
@@ -101,11 +110,11 @@ class HALogDebuggerAI:
             if await self.database.is_log_processed(log_hash):
                 return
             
-            # Mark as processed
+            # Mark as processed (store all logs if capture_all_logs is enabled)
             await self.database.mark_log_processed(log_entry, log_hash)
             
-            # Analyze with AI if it's a warning or error
-            if log_entry.level.value in ["WARNING", "ERROR", "CRITICAL"]:
+            # Analyze with AI if the log level is in the configured analysis levels
+            if log_entry.level.value in self.config["ai_analysis_levels"]:
                 logger.info(f"Processing {log_entry.level.value} from {log_entry.component}: {log_entry.message[:100]}...")
                 
                 recommendations = await self.ai_analyzer.analyze_log_entries([log_entry])
@@ -178,9 +187,24 @@ async def main():
         
         logger.info(f"HA Log Debugger AI is running on port {app_instance.config['web_port']}")
         
+        # Setup periodic cleanup task
+        last_cleanup = datetime.now()
+        cleanup_interval_hours = 24  # Run cleanup daily
+        
         # Keep the application running
         while app_instance.running:
-            await asyncio.sleep(1)
+            await asyncio.sleep(60)  # Check every minute
+            
+            # Run daily cleanup if needed
+            now = datetime.now()
+            if (now - last_cleanup).total_seconds() >= cleanup_interval_hours * 3600:
+                try:
+                    deleted_count = await app_instance.database.cleanup_old_logs(
+                        app_instance.config["log_retention_days"]
+                    )
+                    last_cleanup = now
+                except Exception as e:
+                    logger.error(f"Error during log cleanup: {e}")
         
         # Cancel web server task
         web_task.cancel()

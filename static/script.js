@@ -52,6 +52,21 @@ class HALogDebuggerAI {
         document.getElementById('log-lines').addEventListener('change', () => {
             this.loadLogs();
         });
+        
+        // Log level filter
+        document.getElementById('log-level-filter').addEventListener('change', () => {
+            this.loadLogs();
+        });
+        
+        // Log source selector
+        document.getElementById('log-source').addEventListener('change', () => {
+            this.loadLogs();
+        });
+        
+        // Logs refresh button
+        document.getElementById('logs-refresh-btn').addEventListener('click', () => {
+            this.loadLogs();
+        });
     }
     
     switchTab(tabName) {
@@ -121,7 +136,16 @@ class HALogDebuggerAI {
     async loadLogs() {
         try {
             const lines = document.getElementById('log-lines').value;
-            const response = await fetch(`/api/logs/recent?lines=${lines}`);
+            const level = document.getElementById('log-level-filter').value;
+            const source = document.getElementById('log-source').value;
+            
+            // Build query parameters
+            const params = new URLSearchParams();
+            params.append('lines', lines);
+            if (level) params.append('level', level);
+            params.append('source', source);
+            
+            const response = await fetch(`/api/logs/recent?${params.toString()}`);
             
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);

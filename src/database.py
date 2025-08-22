@@ -52,6 +52,22 @@ class Database:
                 )
             """)
             
+            # Create indexes for performance with larger datasets
+            await db.execute("""
+                CREATE INDEX IF NOT EXISTS idx_processed_logs_timestamp 
+                ON processed_logs(timestamp DESC)
+            """)
+            
+            await db.execute("""
+                CREATE INDEX IF NOT EXISTS idx_processed_logs_level 
+                ON processed_logs(level)
+            """)
+            
+            await db.execute("""
+                CREATE INDEX IF NOT EXISTS idx_processed_logs_component 
+                ON processed_logs(component)
+            """)
+            
             await db.commit()
             logger.info("Database initialized successfully")
     
@@ -134,6 +150,51 @@ class Database:
             ))
             await db.commit()
     
+    async def get_logs(self, limit: int = 100, level_filter: Optional[str] = None, 
+                      component_filter: Optional[str] = None) -> List[LogEntry]:
+        """Get log entries from the database with optional filtering."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            
+            query = "SELECT * FROM processed_logs"
+            params = []
+            conditions = []
+            
+            if level_filter:
+                conditions.append("level = ?")
+                params.append(level_filter)
+                
+            if component_filter:
+                conditions.append("component = ?")
+                params.append(component_filter)
+            
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+            
+            query += " ORDER BY timestamp DESC LIMIT ?"
+            params.append(limit)
+            
+            async with db.execute(query, params) as cursor:
+                rows = await cursor.fetchall()
+                
+                logs = []
+                for row in rows:
+                    from .models import LogLevel
+                    try:
+                        level = LogLevel(row['level'])
+                    except ValueError:
+                        level = LogLevel.INFO
+                        
+                    logs.append(LogEntry(
+                        timestamp=datetime.fromisoformat(row['timestamp']),
+                        level=level,
+                        component=row['component'],
+                        message=row['message'],
+                        raw_line=f"{row['timestamp']} {row['level']} {row['component'] or ''} {row['message']}"
+                    ))
+                
+                return logs
+
     async def get_stats(self) -> dict:
         """Get database statistics."""
         async with aiosqlite.connect(self.db_path) as db:
@@ -154,3 +215,20 @@ class Database:
                 "unresolved_recommendations": unresolved_recommendations,
                 "processed_logs": processed_logs
             }
+    
+    async def cleanup_old_logs(self, retention_days: int = 30):
+        """Clean up old log entries beyond the retention period."""
+        async with aiosqlite.connect(self.db_path) as db:
+            # Delete logs older than retention_days
+            await db.execute("""
+                DELETE FROM processed_logs 
+                WHERE processed_at < datetime('now', '-{} days')
+            """.format(retention_days))
+            
+            deleted_count = db.total_changes
+            await db.commit()
+            
+            if deleted_count > 0:
+                logger.info(f"Cleaned up {deleted_count} old log entries (older than {retention_days} days)")
+            
+            return deleted_count

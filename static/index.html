@@ -68,8 +68,28 @@
                             <option value="50">50</option>
                             <option value="100" selected>100</option>
                             <option value="200">200</option>
+                            <option value="500">500</option>
                         </select>
                     </label>
+                    <label>
+                        Log Level:
+                        <select id="log-level-filter">
+                            <option value="">All Levels</option>
+                            <option value="CRITICAL">Critical</option>
+                            <option value="ERROR">Error</option>
+                            <option value="WARNING">Warning</option>
+                            <option value="INFO">Info</option>
+                            <option value="DEBUG">Debug</option>
+                        </select>
+                    </label>
+                    <label>
+                        Source:
+                        <select id="log-source">
+                            <option value="file">Live File</option>
+                            <option value="database">Database</option>
+                        </select>
+                    </label>
+                    <button id="logs-refresh-btn" class="btn btn-primary">Refresh Logs</button>
                 </div>
                 <div id="logs-list" class="logs-list">
                     <div class="loading">Loading logs...</div>
