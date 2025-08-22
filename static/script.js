@@ -7,13 +7,6 @@ class HALogDebuggerAI {
         this.stats = {};
         this.currentTab = 'recommendations';
         
-        // Initialize markdown-it
-        this.md = window.markdownit({
-            html: true,
-            linkify: true,
-            typographer: true
-        });
-        
         this.init();
     }
     
@@ -255,8 +248,8 @@ class HALogDebuggerAI {
         let renderedContent;
         
         if (isMarkdown) {
-            // Render markdown content
-            renderedContent = this.md.render(recommendation.recommendation);
+            // Render markdown content using simple renderer
+            renderedContent = this.renderMarkdown(recommendation.recommendation);
         } else {
             // Handle legacy plain text content
             renderedContent = `<p>${recommendation.recommendation.replace(/\n/g, '<br>')}</p>`;
@@ -296,6 +289,59 @@ class HALogDebuggerAI {
         ];
         
         return markdownPatterns.some(pattern => pattern.test(content));
+    }
+    
+    renderMarkdown(content) {
+        // Simple markdown renderer for basic formatting
+        let html = content;
+        
+        // Headers
+        html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+        html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+        html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+        
+        // Bold text
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        
+        // Links
+        html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank">$1</a>');
+        
+        // Code blocks
+        html = html.replace(/```([^`]+)```/g, '<pre><code>$1</code></pre>');
+        
+        // Inline code
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+        
+        // Checkboxes
+        html = html.replace(/^-\s+\[\s*\]\s+(.+)$/gm, '<li><input type="checkbox" disabled> $1</li>');
+        html = html.replace(/^-\s+\[x\]\s+(.+)$/gm, '<li><input type="checkbox" checked disabled> $1</li>');
+        
+        // Regular bullet points (not checkboxes)
+        html = html.replace(/^-\s+([^<].+)$/gm, '<li>$1</li>');
+        
+        // Wrap consecutive list items in ul tags
+        html = html.replace(/(<li>.*<\/li>)/gs, (match) => {
+            const items = match.split('\n').filter(line => line.trim());
+            if (items.length > 0) {
+                return '<ul>' + items.join('') + '</ul>';
+            }
+            return match;
+        });
+        
+        // Paragraphs (split by double newlines)
+        const paragraphs = html.split(/\n\s*\n/);
+        html = paragraphs.map(p => {
+            p = p.trim();
+            if (p && !p.startsWith('<')) {
+                return `<p>${p}</p>`;
+            }
+            return p;
+        }).join('\n');
+        
+        // Single line breaks
+        html = html.replace(/\n/g, '<br>');
+        
+        return html;
     }
     
     renderLogs() {
