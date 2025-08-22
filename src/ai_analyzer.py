@@ -3,10 +3,12 @@
 import asyncio
 import logging
 import json
+import re
 from datetime import datetime
 from typing import List, Optional
 from openai import AsyncOpenAI
 from .models import LogEntry, Recommendation
+from .web_search import WebSearchService
 
 logger = logging.getLogger(__name__)
 
@@ -37,12 +39,34 @@ When analyzing log entries, please:
 4. Suggest preventive measures if appropriate
 5. Rate the severity as: LOW, MEDIUM, HIGH, or CRITICAL
 
-Respond with a JSON object containing:
-- "issue_summary": A brief description of the problem
-- "recommendation": Detailed steps to fix the issue
-- "severity": The severity level (LOW/MEDIUM/HIGH/CRITICAL)
+You will be provided with:
+- Log entry details (timestamp, level, component, message)
+- Relevant Home Assistant documentation links
+- Related GitHub issues from the Home Assistant core repository
 
-Keep recommendations concise but comprehensive. Focus on practical solutions that users can implement."""
+Please respond with structured Markdown content in the following format:
+
+# [Clear Issue Title]
+
+## [Brief description of the problem as a subtitle]
+
+**Severity:** [LOW/MEDIUM/HIGH/CRITICAL]
+
+### Recommendations:
+- [ ] [Specific actionable step 1]
+- [ ] [Specific actionable step 2]
+- [ ] [Additional steps as needed]
+
+### Related Documentation:
+[Include any provided documentation links with descriptive text]
+
+### Similar Issues:
+[Include any provided GitHub issue links with descriptive text]
+
+### Additional Notes:
+[Any additional context, configuration examples, or preventive measures]
+
+Focus on practical solutions that users can implement. Use checkboxes for actionable items to make it easy for users to track their progress."""
     
     async def analyze_log_entries(self, log_entries: List[LogEntry]) -> List[Recommendation]:
         """Analyze a batch of log entries and generate recommendations."""
@@ -91,8 +115,20 @@ Keep recommendations concise but comprehensive. Focus on practical solutions tha
         # Use the first entry as representative
         representative_entry = log_entries[0]
         
+        # Get contextual information from web search
+        contextual_info = {}
+        try:
+            async with WebSearchService() as search_service:
+                contextual_info = await search_service.get_contextual_information(
+                    representative_entry.message,
+                    representative_entry.component
+                )
+        except Exception as e:
+            logger.warning(f"Failed to get contextual information: {e}")
+            contextual_info = {'documentation': [], 'issues': []}
+        
         # Create context for the AI
-        context = self._create_analysis_context(log_entries)
+        context = self._create_analysis_context(log_entries, contextual_info)
         
         try:
             response = await self.client.chat.completions.create(
@@ -102,37 +138,41 @@ Keep recommendations concise but comprehensive. Focus on practical solutions tha
                     {"role": "user", "content": context}
                 ],
                 temperature=0.1,  # Low temperature for consistent responses
-                max_tokens=1000
+                max_tokens=2000  # Increased for markdown content
             )
             
             result = response.choices[0].message.content
             
-            # Parse the JSON response
+            # Parse the markdown response to extract structured data
             try:
-                analysis = json.loads(result)
+                parsed_data = self._parse_markdown_response(result)
                 
                 # Generate hash for the log entry group
                 log_hash = self._generate_group_hash(log_entries)
                 
                 return Recommendation(
                     log_entry_hash=log_hash,
-                    issue_summary=analysis.get("issue_summary", "Unknown issue"),
-                    recommendation=analysis.get("recommendation", "No specific recommendation available"),
-                    severity=analysis.get("severity", "MEDIUM"),
+                    issue_summary=parsed_data.get("issue_summary", "Unknown issue"),
+                    recommendation=result,  # Store the full markdown content
+                    severity=parsed_data.get("severity", "MEDIUM"),
                     created_at=datetime.now(),
                     resolved=False
                 )
             
-            except json.JSONDecodeError:
-                logger.warning(f"Failed to parse AI response as JSON: {result}")
-                # Fallback to plain text response
+            except Exception as e:
+                logger.warning(f"Failed to parse markdown response: {e}")
+                # Fallback handling
                 log_hash = self._generate_group_hash(log_entries)
+                
+                # Try to extract severity from markdown if possible
+                severity = self._extract_severity_from_markdown(result)
+                issue_summary = self._extract_title_from_markdown(result)
                 
                 return Recommendation(
                     log_entry_hash=log_hash,
-                    issue_summary=f"{representative_entry.level.value} in {representative_entry.component}",
+                    issue_summary=issue_summary or f"{representative_entry.level.value} in {representative_entry.component}",
                     recommendation=result,
-                    severity="MEDIUM",
+                    severity=severity,
                     created_at=datetime.now(),
                     resolved=False
                 )
@@ -141,7 +181,7 @@ Keep recommendations concise but comprehensive. Focus on practical solutions tha
             logger.error(f"Error calling AI service: {e}")
             return None
     
-    def _create_analysis_context(self, log_entries: List[LogEntry]) -> str:
+    def _create_analysis_context(self, log_entries: List[LogEntry], contextual_info: dict = None) -> str:
         """Create context string for AI analysis."""
         context_parts = [
             "Please analyze the following Home Assistant log entries and provide recommendations:",
@@ -162,7 +202,26 @@ Keep recommendations concise but comprehensive. Focus on practical solutions tha
             context_parts.append(f"... and {len(log_entries) - 5} more similar entries")
             context_parts.append("")
         
-        context_parts.append("Please provide your analysis in JSON format with issue_summary, recommendation, and severity fields.")
+        # Add contextual information if available
+        if contextual_info:
+            if contextual_info.get('documentation'):
+                context_parts.append("Related Home Assistant Documentation:")
+                for doc in contextual_info['documentation']:
+                    context_parts.append(f"- {doc['title']}: {doc['url']}")
+                    if doc.get('description'):
+                        context_parts.append(f"  Description: {doc['description']}")
+                context_parts.append("")
+            
+            if contextual_info.get('issues'):
+                context_parts.append("Related GitHub Issues:")
+                for issue in contextual_info['issues']:
+                    context_parts.append(f"- #{issue['number']}: {issue['title']} ({issue['state']})")
+                    context_parts.append(f"  URL: {issue['url']}")
+                    if issue.get('description'):
+                        context_parts.append(f"  Description: {issue['description']}")
+                context_parts.append("")
+        
+        context_parts.append("Please provide your analysis in the structured Markdown format specified in the system prompt.")
         
         return "\n".join(context_parts)
     
@@ -174,6 +233,57 @@ Keep recommendations concise but comprehensive. Focus on practical solutions tha
         representative = log_entries[0]
         content = f"{representative.level.value}:{representative.component}:{representative.message[:200]}"
         return hashlib.md5(content.encode()).hexdigest()
+    
+    def _parse_markdown_response(self, markdown_content: str) -> dict:
+        """Parse markdown response to extract structured data."""
+        result = {
+            "issue_summary": "Unknown issue",
+            "severity": "MEDIUM"
+        }
+        
+        # Extract title (first # heading)
+        title_match = re.search(r'^#\s+(.+)$', markdown_content, re.MULTILINE)
+        if title_match:
+            title = title_match.group(1).strip()
+            result["issue_summary"] = title
+        
+        # Extract subtitle (first ## heading)  
+        subtitle_match = re.search(r'^##\s+(.+)$', markdown_content, re.MULTILINE)
+        if subtitle_match:
+            subtitle = subtitle_match.group(1).strip()
+            result["issue_summary"] = subtitle  # Use subtitle as issue summary
+        
+        # Extract severity
+        severity_match = re.search(r'\*\*Severity:\*\*\s*(\w+)', markdown_content, re.IGNORECASE)
+        if severity_match:
+            severity = severity_match.group(1).upper()
+            if severity in ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']:
+                result["severity"] = severity
+        
+        return result
+    
+    def _extract_severity_from_markdown(self, content: str) -> str:
+        """Extract severity from markdown content."""
+        severity_match = re.search(r'\*\*Severity:\*\*\s*(\w+)', content, re.IGNORECASE)
+        if severity_match:
+            severity = severity_match.group(1).upper()
+            if severity in ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']:
+                return severity
+        return "MEDIUM"
+    
+    def _extract_title_from_markdown(self, content: str) -> Optional[str]:
+        """Extract title/issue summary from markdown content."""
+        # Try subtitle first (## heading)
+        subtitle_match = re.search(r'^##\s+(.+)$', content, re.MULTILINE)
+        if subtitle_match:
+            return subtitle_match.group(1).strip()
+        
+        # Fallback to title (# heading)
+        title_match = re.search(r'^#\s+(.+)$', content, re.MULTILINE)
+        if title_match:
+            return title_match.group(1).strip()
+        
+        return None
     
     async def test_connection(self) -> bool:
         """Test the AI service connection."""
