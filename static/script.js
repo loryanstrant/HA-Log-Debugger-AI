@@ -7,6 +7,13 @@ class HALogDebuggerAI {
         this.stats = {};
         this.currentTab = 'recommendations';
         
+        // Initialize markdown-it
+        this.md = window.markdownit({
+            html: true,
+            linkify: true,
+            typographer: true
+        });
+        
         this.init();
     }
     
@@ -243,6 +250,18 @@ class HALogDebuggerAI {
         const createdAt = new Date(recommendation.created_at).toLocaleString();
         const resolvedClass = recommendation.resolved ? 'resolved' : '';
         
+        // Check if recommendation content is markdown (starts with # or contains markdown patterns)
+        const isMarkdown = this.isMarkdownContent(recommendation.recommendation);
+        let renderedContent;
+        
+        if (isMarkdown) {
+            // Render markdown content
+            renderedContent = this.md.render(recommendation.recommendation);
+        } else {
+            // Handle legacy plain text content
+            renderedContent = `<p>${recommendation.recommendation.replace(/\n/g, '<br>')}</p>`;
+        }
+        
         return `
             <div class="recommendation-card collapsed ${resolvedClass}">
                 <div class="recommendation-header">
@@ -253,7 +272,7 @@ class HALogDebuggerAI {
                     <small>${createdAt}</small>
                 </div>
                 <div class="recommendation-content">
-                    <div class="recommendation-text">${recommendation.recommendation}</div>
+                    <div class="recommendation-text markdown-content">${renderedContent}</div>
                     <div class="recommendation-actions">
                         ${!recommendation.resolved ? 
                             `<button class="btn btn-primary resolve-btn" data-rec-id="${recommendation.id}">Mark Resolved</button>` : 
@@ -263,6 +282,20 @@ class HALogDebuggerAI {
                 </div>
             </div>
         `;
+    }
+    
+    isMarkdownContent(content) {
+        // Check if content looks like markdown
+        const markdownPatterns = [
+            /^#\s+/m,           // Headers
+            /^\*\*.*?\*\*/m,    // Bold text
+            /^-\s+\[.*?\]/m,    // Checkboxes
+            /^\*\s+/m,          // Bullet lists
+            /^\d+\.\s+/m,       // Numbered lists
+            /\[.*?\]\(.*?\)/    // Links
+        ];
+        
+        return markdownPatterns.some(pattern => pattern.test(content));
     }
     
     renderLogs() {
