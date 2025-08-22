@@ -215,3 +215,20 @@ class Database:
                 "unresolved_recommendations": unresolved_recommendations,
                 "processed_logs": processed_logs
             }
+    
+    async def cleanup_old_logs(self, retention_days: int = 30):
+        """Clean up old log entries beyond the retention period."""
+        async with aiosqlite.connect(self.db_path) as db:
+            # Delete logs older than retention_days
+            await db.execute("""
+                DELETE FROM processed_logs 
+                WHERE processed_at < datetime('now', '-{} days')
+            """.format(retention_days))
+            
+            deleted_count = db.total_changes
+            await db.commit()
+            
+            if deleted_count > 0:
+                logger.info(f"Cleaned up {deleted_count} old log entries (older than {retention_days} days)")
+            
+            return deleted_count

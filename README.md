@@ -69,6 +69,9 @@ docker run -d \
 | `HA_CONFIG_PATH` | ❌ | `/config` | Path to Home Assistant config directory |
 | `LOG_LEVEL` | ❌ | `INFO` | Application log level (DEBUG, INFO, WARNING, ERROR) |
 | `WEB_PORT` | ❌ | `8080` | Web interface port |
+| `CAPTURE_ALL_LOGS` | ❌ | `true` | Enable capture of all log levels (true/false) |
+| `AI_ANALYSIS_LEVELS` | ❌ | `WARNING,ERROR,CRITICAL` | Comma-separated log levels for AI analysis |
+| `LOG_RETENTION_DAYS` | ❌ | `30` | Number of days to retain non-critical logs |
 
 ### Volume Mounts
 
@@ -86,9 +89,12 @@ The web interface provides three main tabs:
 - Expand/collapse detailed recommendations
 
 ### Recent Logs
-- View recent log entries from Home Assistant
-- Filter by number of lines to display
+- View recent log entries from Home Assistant (all levels: DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- Filter by log level (Critical, Error, Warning, Info, Debug)
+- Choose data source (Live File or Database)
+- Configurable number of lines to display (50, 100, 200, 500)
 - Color-coded log levels for easy identification
+- Real-time log monitoring with enhanced filtering
 
 ### Statistics
 - System health status
@@ -103,7 +109,7 @@ The application exposes a REST API for integration:
 - `GET /api/recommendations` - Get all recommendations
 - `GET /api/recommendations?resolved=false` - Get unresolved recommendations
 - `POST /api/recommendations/{id}/resolve` - Mark recommendation as resolved
-- `GET /api/logs/recent?lines=100` - Get recent log entries
+- `GET /api/logs/recent?lines=100&level=ERROR&source=database` - Get recent log entries with filtering
 - `GET /api/stats` - Get application statistics
 - `POST /api/analyze` - Manually trigger log analysis
 
